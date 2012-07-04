@@ -6,29 +6,87 @@ import ystockquote
 from pprint import pprint
 import yaml
 
-def create_table(conn):
-    conn.execute('''
-create table if not exists prices (
-    sym varchar(10),
-    dt date, 
-    open real, 
-    high real, 
-    low real, 
-    close real, 
-    volume integer, 
-    adjClose real);''')
-    conn.execute('create unique index if not exists prices_idx on prices (sym, dt)')
-    truncate(conn, 'prices')
+def drop_source(c):
+    drop(c, *'period duration quote symbol'.split())
+
+def drop_derived(c):
+    drop(c, *'return volatility'.split())
+
+def drop_all(c):
+    drop_derived(c)
+    drop_source(c)
+
+def create_source_tables(c):
+    drop_all(c)
+    
+    print 'create source tables'
+    c.execute('''
+CREATE TABLE symbol (
+    sym_id INTEGER PRIMARY KEY,
+    sym TEXT UNIQUE NOT NULL,
+    description TEXT NOT NULL
+)''')
+    c.execute('''
+CREATE TABLE quote (
+    quote_id INTEGER PRIMARY KEY,
+    sym_id INTEGER,
+    dt DATE NOT NULL, 
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    volume REAL NOT NULL,
+    adjClose REAL NOT NULL,
+    FOREIGN KEY(sym_id) REFERENCES symbol(sym_id)
+)''')
+    c.execute('CREATE UNIQUE INDEX quote_sym_dt ON quote (sym_id, dt)')
+    c.execute('''
+CREATE TABLE duration (
+    duration_id INTEGER PRIMARY KEY,
+    unit TEXT NOT NULL,
+    unit_qty INTEGER NOT NULL,
+    days INTEGER NOT NULL
+)''')
+    c.execute('CREATE UNIQUE INDEX duration_unit_qty ON duration (unit, unit_qty)')
+    truncate(c, 'duration')
+    durations = [ \
+        ['day', 1, 1], \
+        ['week', 1, 10], \
+        ['day', 20, 20], \
+        ['month', 1, 21], \
+        ['quarter', 1, 63]]
+    c.executemany('INSERT INTO duration (unit, unit_qty, days) VALUES (?,?,?)', durations)
+
+    c.execute('''
+CREATE TABLE period (
+    period_id INTEGER PRIMARY KEY,
+    duration_id INTEGER,
+    start_dt DATE NOT NULL,
+    end_dt DATE NOT NULL,
+    FOREIGN KEY(duration_id) REFERENCES duration(duration_id)
+)''')
+
+def insert_symbols(c, symbols_filename):
+    print 'load symbols'
+    truncate(c, 'symbol')
+    with open(symbols_filename) as sym_cfg:
+        sym_data = yaml.load(sym_cfg)
+        syms = sorted((sym, desc) for cat in sym_data.itervalues() for sym, desc in cat.iteritems())
+    c.executemany('INSERT INTO symbol (sym, description) VALUES (?,?)', syms)
 
 def get_historical_prices(sym, start_date, end_date):
-    print sym, start_date, end_date
+    print 'get quotes:', sym, start_date, end_date
     ticks = ystockquote.get_historical_prices(sym, start_date, end_date)[1:]
     return [[sym, datetime.datetime.strptime(tick[0], '%Y-%m-%d').date()] + tick[1:] for tick in ticks]
 
-def insert_prices(conn, *syms):
-    for sym in syms:
+def insert_quotes(c):
+    truncate(c, 'quote')
+    ksym_vid = dict_q(c, 'symbol', 'sym', 'sym_id')
+    for sym, sym_id in ksym_vid.iteritems():
         ticks = get_historical_prices(sym, '2010-06-12', '2012-06-30')
-        conn.executemany('INSERT INTO prices VALUES (?,?,?,?,?,?,?,?)', ticks)
+        c.executemany('''
+INSERT INTO quote (sym_id, dt, open, high, low, close, volume, adjClose) VALUES (
+(SELECT sym_id FROM symbol WHERE sym = ?),?,?,?,?,?,?,?)''', ticks)
 
 def compute_trading_days(c):
     print 'compute trading days'
@@ -157,8 +215,17 @@ def backtest(c, syms, period, metrics, weights):
 def symbols(c):
     return col_query(c, 'select distinct sym from prices;')
 
+def dict_q(c, table, key_col, value_col):
+    '''returns a q_col_i -> id_col_i dict'''
+    return dict(c.execute('select {}, {} from {}'.format(key_col, value_col, table)).fetchall())
+
 def truncate(c, table):
     c.execute('delete from {}'.format(table))
+
+def drop(c, *tables):
+    print 'dropping', tables
+    for t in tables:
+        c.execute('drop table if exists ' + t)
 
 def period_tables(c):
     return col_query(c, "select name from sqlite_master where name like 'period_%'")
@@ -178,13 +245,11 @@ def stdev(s):
     stdev = (sdsq / (len(s) - 1)) ** 0.5
     return stdev
 
-def main():
-##    with open('symbols.yml') as sym_cfg:
-##        sym_data = yaml.load(sym_cfg)
-##        syms = [sym for cat in sym_data.values() for sym in cat.keys()]
-    
+def main():    
     with sqlite3.connect('prices.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES) as c:
-##        create_table(c)
+##        create_source_tables(c)
+##        insert_symbols(c, 'symbols.yml')
+        insert_quotes(c)
 ##        insert_prices(c, *syms)
 ##        compute_trading_days(c)
 ##        compute_trading_months(c)
@@ -193,8 +258,8 @@ def main():
 ##        for months in (1, 3, 6):
 ##            compute_periods(c, months, 'month')
 ##        compute_returns(c)
-        compute_volatility(c)
-        print screen(c, symbols(c), datetime.date(2012, 6, 29), ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))
+##        compute_volatility(c)
+##        print screen(c, symbols(c), datetime.date(2012, 6, 29), ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))
         #backtest(c, symbols(c), 'period_month_1', ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))       
 
 
