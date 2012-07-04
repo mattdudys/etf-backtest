@@ -1,0 +1,79 @@
+broad-market:
+  DIA: SPDR DJIA Trust
+  IVV: iShares S&P 500 Index Fund
+  IWB: iShares Russell 1000
+  IWM: iShares Russel 2000
+  MDY: SPDR S&P Midcap 400
+  RSP: Rydex Equal Weight S&P 500
+  SPY: SPDR S&P 500
+  
+sector:
+  IBB: iShares NASDAQ Biotech
+  IYR: iShares Dow Jones U.S. Real Estate Index Fund
+  IYT: iShares DJ Transportation
+  PBW: PowerShares WilderHill Clean Energy
+  PDP: PowerShares DWA Technical Leaders
+  PHO: PowerShares Water Resources
+  QQQ: PowerShares QQQ
+  SMH: Market Vectors Semiconductor
+  VGT: Vanguard Information Technology
+  VNQ: Vanguard U.S. REIT
+  XHB: SPDR Homebuilders
+  XLB: SPDR Materials
+  XLE: SPDR Energy
+  XLF: SPDR Financial
+  XLI: SPDR Industrial
+  XLK: SPDR Technology
+  XLP: SPDR Consumer Staples
+  XLU: SPDR Utilities
+  XLV: SPDR Healthcare
+  XLY: SPDR Consumer Discretionary
+  XRT: SPDR Retail
+  
+international:
+  BRF: Market Vectors Brazil Small Cap
+  EEM: iShares MSCI Emerging Markets
+  EFA: iShares MSCI EAFE
+  EPI: WisdomTree India Earnings Fund
+  EWA: iShares MSCI Australia
+  EWC: iShares MSCI Canada
+  EWT: iShares MSCI Taiwan
+  EWZ: iShares MSCI Brazil Index Fund
+  FXI: iShares FTSE-Xinhua China 25 Fund
+  PID: PowerShares Int'l Dividend Achievers
+  RWX: SPDR DJ Wilshire Int'l Real Estate
+  VWO: Vanguard Emerging Markets
+ 
+fixed-income:
+  AGG: iShares Barclays Aggregate Bond (4-5yr)
+  BIL: SPDR 1-3 Month T-Bill ETF (0.2yr)
+  BIV: Vanguard Barclays Govt-Credit Mix (6-7yr)
+  BLV: Vanguard Long-Term Bond ETF
+  BND: Banguard Total Bond Market (4-5yr)
+  BOND: PIMCO Total Return ETF
+  BSV: Banguard Short-Term Bond Mix (2-3yr)
+  CFT: iShares Barclays Credit Bond Index (6yr)
+  CIU: iShares Barclays Intermed Credit (4-5yr)
+  CSJ: iShares Barclays 1-3 Year Credit (2yr)
+  HYG: iShares iBoxx $ High Yield Corporate Bond Fund
+  IEF: iShares Barclays 7-10 Year Treasury Bond (7-8yr)
+  IEI: iShares Barclays 3-7 Year Treasury Bond (4-5yr)
+  JNK: SPDR Barcap High=Yield Junk Bond (4-7yr)
+  LQD: iShares iBoxx Invest Grade Bond (7-8yr)
+  MINT: PIMCO Enhanced Short-Term Bond (0.6yr)
+  SHV: Barclays Short-Term Ytreasury (0.4yr)
+  SHY: iShares Barclays 1-3 Year Treasury Bond Fund
+  STPZ: PIMCO 1-5 Year U.S. TIPS Index (2.5yr)
+  TIP: iShares Barclays TIPS (4-8yr)
+  TLT: iShares Barclays 20 Year Treasury Bond Fund
+  VCIT: Vanguard Interm Corp Bond (6-7yr)
+  VCSH: Vanguard Short-Term Inv Grd Bond (2-3yr)
+
+commodities:
+  DBC: PowerShares DB Comm
+  GDX: Market Vectors Gold Miners
+  GLD: SPDR Gold Trust Shares
+  SLV: iShares Silver
+  USO: US Oil Fund ETF
+  XOP: SPDR Oil & Gas Expl & Prod
+ 
