@@ -5,12 +5,14 @@ import sys
 import ystockquote
 from pprint import pprint
 import yaml
+from itertools import izip
 
 def drop_source(c):
     drop(c, *'period duration quote symbol'.split())
 
 def drop_derived(c):
     drop(c, *'return volatility'.split())
+    c.execute('DROP VIEW IF EXISTS daily_return')
 
 def drop_all(c):
     drop_derived(c)
@@ -40,19 +42,18 @@ CREATE TABLE quote (
     FOREIGN KEY(sym_id) REFERENCES symbol(sym_id)
 )''')
     c.execute('CREATE UNIQUE INDEX quote_sym_dt ON quote (sym_id, dt)')
+    c.execute('CREATE UNIQUE INDEX quote_dt_sym ON quote(dt, sym_id)')
     c.execute('''
 CREATE TABLE duration (
     duration_id INTEGER PRIMARY KEY,
     unit TEXT NOT NULL,
     unit_qty INTEGER NOT NULL,
-    days INTEGER NOT NULL
+    days INTEGER UNIQUE NOT NULL
 )''')
     c.execute('CREATE UNIQUE INDEX duration_unit_qty ON duration (unit, unit_qty)')
     truncate(c, 'duration')
     durations = [ \
         ['day', 1, 1], \
-        ['week', 1, 10], \
-        ['day', 20, 20], \
         ['month', 1, 21], \
         ['quarter', 1, 63]]
     c.executemany('INSERT INTO duration (unit, unit_qty, days) VALUES (?,?,?)', durations)
@@ -65,6 +66,27 @@ CREATE TABLE period (
     end_dt DATE NOT NULL,
     FOREIGN KEY(duration_id) REFERENCES duration(duration_id)
 )''')
+
+def create_derived_tables(c):
+    print 'create derived tables'
+    drop_derived(c)
+
+    c.execute('''
+CREATE TABLE return (
+    return_id INTEGER PRIMARY KEY,
+    sym_id INTEGER,
+    period_id INTEGER,
+    return REAL NOT NULL,
+    FOREIGN KEY(sym_id) REFERENCES symbol(sym_id),
+    FOREIGN KEY(period_id) REFERENCES period(period_id)
+);''')
+    c.execute('CREATE UNIQUE INDEX return_sym_period ON return (sym_id, period_id)')
+
+    c.execute('''
+CREATE VIEW daily_return AS
+SELECT r.sym_id AS sym_id, r.period_id AS period_id, return
+FROM return r natural join period p natural join duration d
+WHERE d.days = 1''')
 
 def insert_symbols(c, symbols_filename):
     print 'load symbols'
@@ -88,51 +110,28 @@ def insert_quotes(c):
 INSERT INTO quote (sym_id, dt, open, high, low, close, volume, adjClose) VALUES (
 (SELECT sym_id FROM symbol WHERE sym = ?),?,?,?,?,?,?,?)''', ticks)
 
-def compute_trading_days(c):
-    print 'compute trading days'
-    c.execute('create table if not exists trading_day (dt date)')
-    truncate(c, 'trading_day')
-    c.execute('insert into trading_day select distinct dt from prices')
-    c.execute('create unique index if not exists trading_day_idx on trading_day (dt)')
-
-def compute_trading_months(c):
-    print 'compute last trading day of the month'
-    c.execute('create table if not exists trading_month (dt date)')
-    truncate(c, 'trading_month')
-    c.execute('''insert into trading_month
-select max(dt) from trading_day group by date(dt, 'start of month')''')
-    c.execute('create unique index if not exists trading_month_idx on trading_month (dt)')
-
-def compute_periods(c, n, unit):
-    period_table = 'period_{}_{}'.format(unit, n)
-    print 'compute {} {} periods -> {}'.format(n, unit, period_table)
-    days = col_query(c, 'select dt from trading_{} order by dt asc'.format(unit))
-    if len(days) <= n:
-        raise ValueError, 'not enough data to compute {} {} periods'.format(n, unit)
-    periods = zip(days, days[n:])
-    c.execute('''
-create table if not exists {} (
-    start_dt date,
-    end_dt date);'''.format(period_table))
-    truncate(c, period_table)
-    c.executemany('insert into {} values (?,?)'.format(period_table), periods)
+def compute_periods(c):
+    durations = c.execute('select duration_id, unit, unit_qty, days from duration').fetchall()
+    trading_days = col_query(c, 'select distinct dt from quote order by dt')
+    for duration_id, unit, unit_qty, days in durations:
+        if len(trading_days) < days:
+            raise ValueError, "not enough trading days to compute {} day periods".format(days)        
+        print 'compute {} {} period: {} days'.format(unit_qty, unit, days)
+        for start_dt, end_dt in izip(trading_days, trading_days[days:]):
+            c.execute('INSERT INTO period (duration_id, start_dt, end_dt) VALUES (?,?,?)', (duration_id, start_dt, end_dt))
 
 def compute_returns(c):
-    for period_t in period_tables(c):
-        unit, n = period_t.split('_')[1:3]
-        return_table = 'return_{}_{}'.format(unit, n)
-        print 'compute {} {} returns -> {}'.format(n, unit, return_table)
-        c.execute('''
-create table if not exists {} (
-    sym varchar(10),
-    end_dt date,
-    return real);'''.format(return_table))
-        truncate(c, return_table)
-        c.execute('''
-insert into {}
-select p1.sym, pt.end_dt, (p2.adjClose - p1.adjClose) / p1.adjClose
-from {} pt, prices p1, prices p2
-where pt.start_dt = p1.dt and pt.end_dt = p2.dt and p1.sym = p2.sym;'''.format(return_table, period_t))
+    print 'compute returns'
+    c.execute('''
+INSERT INTO return (sym_id, period_id, return)
+SELECT q1.sym_id, p.period_id, (q2.adjClose - q1.adjClose) / q1.adjClose
+FROM period p,
+    quote q1,
+    quote q2
+WHERE
+    p.start_dt = q1.dt AND
+    p.end_dt = q2.dt AND
+    q1.sym_id = q2.sym_id''')
 
 def compute_volatility(c):
     vol_periods = col_query(c, "select name from sqlite_master where name like 'period_%' and name not like '%_day_1'")
@@ -249,15 +248,10 @@ def main():
     with sqlite3.connect('prices.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES) as c:
 ##        create_source_tables(c)
 ##        insert_symbols(c, 'symbols.yml')
-        insert_quotes(c)
-##        insert_prices(c, *syms)
-##        compute_trading_days(c)
-##        compute_trading_months(c)
-##        for days in (1, 10, 20, 30):
-##            compute_periods(c, days, 'day')
-##        for months in (1, 3, 6):
-##            compute_periods(c, months, 'month')
-##        compute_returns(c)
+##        insert_quotes(c)
+##        compute_periods(c)
+        create_derived_tables(c)
+        compute_returns(c)
 ##        compute_volatility(c)
 ##        print screen(c, symbols(c), datetime.date(2012, 6, 29), ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))
         #backtest(c, symbols(c), 'period_month_1', ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))       
