@@ -6,6 +6,7 @@ import ystockquote
 from pprint import pprint
 import yaml
 from itertools import izip
+import numpy as np
 
 def drop_source(c):
     drop(c, *'period duration quote symbol'.split())
@@ -79,7 +80,7 @@ CREATE TABLE return (
     return REAL NOT NULL,
     FOREIGN KEY(sym_id) REFERENCES symbol(sym_id),
     FOREIGN KEY(period_id) REFERENCES period(period_id)
-);''')
+)''')
     c.execute('CREATE UNIQUE INDEX return_sym_period ON return (sym_id, period_id)')
 
     c.execute('''
@@ -87,6 +88,17 @@ CREATE VIEW daily_return AS
 SELECT r.sym_id AS sym_id, r.period_id AS period_id, return
 FROM return r natural join period p natural join duration d
 WHERE d.days = 1''')
+
+    c.execute('''
+CREATE TABLE volatility (
+    volatility_id INTEGER PRIMARY KEY,
+    sym_id INTEGER,
+    period_id INTEGER,
+    volatility REAL NOT NULL,
+    FOREIGN KEY(sym_id) REFERENCES symbol(sym_id),
+    FOREIGN KEY(period_id) REFERENCES period(period_id)
+)''')
+    c.execute('CREATE UNIQUE INDEX volatility_sym_period ON volatility (sym_id, period_id)')
 
 def insert_symbols(c, symbols_filename):
     print 'load symbols'
@@ -133,33 +145,44 @@ WHERE
     p.end_dt = q2.dt AND
     q1.sym_id = q2.sym_id''')
 
+class Volatility:
+    def __init__(self):
+        self.a = []
+
+    def step(self, value):
+        self.a.append(value)
+
+    def finalize(self):
+        return np.array(self.a).std() * 254 ** 0.5
+
 def compute_volatility(c):
-    vol_periods = col_query(c, "select name from sqlite_master where name like 'period_%' and name not like '%_day_1'")
-    for period_t in vol_periods:
-        unit, n = period_t.split('_')[1:3]
-        volatility_table = 'volatility_{}_{}'.format(unit, n)
-        print 'compute {} {} volatility -> {}'.format(n, unit, volatility_table)
+    c.create_aggregate('vol', 1, Volatility)
+    sym_symid = dict_q(c, 'symbol', 'sym', 'sym_id')
+    for sym, sym_id in sym_symid.iteritems():
+        print 'compute volatility for', sym
         c.execute('''
-create table if not exists {} (
-    sym varchar(10),
-    end_dt date,
-    volatility real);'''.format(volatility_table))
-        truncate(c, volatility_table)
-        syms = symbols(c)
-        
-        for start_dt, end_dt in c.execute('select start_dt, end_dt from {}'.format(period_t)).fetchall():
-            print period_t, end_dt
-            for sym in syms:
-                returns = tuple(r[0] for r in c.execute('''
-select return
-from return_day_1
-where sym = ? and
-      ? < date(end_dt) and
-      date(end_dt) <= ?''', (sym, start_dt, end_dt)).fetchall())
-                if len(returns) < n:
-                    continue
-                vol = stdev(returns) * (254 ** 0.5)
-                c.execute('insert into {} values (?, ?, ?)'.format(volatility_table), (sym, end_dt, vol))
+INSERT INTO volatility (sym_id, period_id, volatility)
+SELECT ?, vwp.period_id, vol(wr.return)
+FROM
+   (SELECT wp.period_id AS period_id, wp.start_dt AS start_dt, wp.end_dt AS end_dt
+    FROM
+       (SELECT MIN(drp.start_dt) AS mn_dt, MAX(drp.end_dt) AS mx_dt
+        FROM daily_return dr
+             NATURAL JOIN period drp
+        WHERE dr.sym_id = ?) drr,
+        period wp
+        NATURAL JOIN duration vd
+    WHERE vd.days > 1 AND
+          drr.mn_dt <= wp.start_dt AND
+          wp.end_dt <= drr.mx_dt) AS vwp,
+   (SELECT drp.end_dt AS dt, dr.return AS return
+    FROM daily_return dr
+         NATURAL JOIN period drp
+    WHERE dr.sym_id = ?) AS wr
+WHERE vwp.start_dt < wr.dt AND
+      wr.dt <= vwp.end_dt
+GROUP BY vwp.period_id''', (sym_id, sym_id, sym_id))
+
 
 class ScreenResult:
 
@@ -250,9 +273,9 @@ def main():
 ##        insert_symbols(c, 'symbols.yml')
 ##        insert_quotes(c)
 ##        compute_periods(c)
-        create_derived_tables(c)
-        compute_returns(c)
-##        compute_volatility(c)
+##        create_derived_tables(c)
+##        compute_returns(c)
+        compute_volatility(c)
 ##        print screen(c, symbols(c), datetime.date(2012, 6, 29), ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))
         #backtest(c, symbols(c), 'period_month_1', ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))       
 
