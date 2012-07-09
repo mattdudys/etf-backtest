@@ -7,6 +7,7 @@ from pprint import pprint
 import yaml
 from itertools import izip
 import numpy as np
+from collections import defaultdict
 
 def drop_source(c):
     drop(c, *'period duration quote symbol'.split())
@@ -117,9 +118,9 @@ def insert_quotes(c):
     truncate(c, 'quote')
     ksym_vid = dict_q(c, 'symbol', 'sym', 'sym_id')
     for sym, sym_id in ksym_vid.iteritems():
-        ticks = get_historical_prices(sym, '2010-06-12', '2012-06-30')
+        ticks = get_historical_prices(sym, '2010-06-12', '2012-07-08')
         c.executemany('''
-INSERT INTO quote (sym_id, dt, open, high, low, close, volume, adjClose) VALUES (
+INSERT OR REPLACE INTO quote (sym_id, dt, open, high, low, close, volume, adjClose) VALUES (
 (SELECT sym_id FROM symbol WHERE sym = ?),?,?,?,?,?,?,?)''', ticks)
 
 def compute_periods(c):
@@ -183,33 +184,34 @@ WHERE vwp.start_dt < wr.dt AND
       wr.dt <= vwp.end_dt
 GROUP BY vwp.period_id''', (sym_id, sym_id, sym_id))
 
-
-class ScreenResult:
-
-    def __init__(self, metrics, results):
-        self.sym = results[0]
-        self.metrics = dict(zip(metrics, results[1:]))
-
-    def __str__(self):
-        print sym, metrics
-
-def screen(c, syms, end_dt, metrics, weights):
-    assert len(metrics) == len(weights) and len(metrics) >= 1
-    num_tables = len(metrics)
-
-    selects = 't0.sym, ' + \
-              ', '.join('t{0}.{1}'.format(i, m.split('_')[0]) \
-                        for i, m in enumerate(metrics))
-    table_aliases = ', '.join('{1} t{0}'.format(i, m) for i, m in enumerate(metrics))
-    joins = ' and '.join('t{0}.sym = t{1}.sym and t{0}.end_dt = t{1}.end_dt'.format(i, i+1) \
-                         for i in range(0, num_tables - 1))
-
-    query = 'select {0} from {1} where {2} and t0.end_dt = ? and t0.sym in ({3})'''.format( \
-        selects, table_aliases, joins, ','.join('?' for s in syms))
-
-    results = c.execute(query, (end_dt,) + syms).fetchall()
-    results = sorted(results, key=lambda r: sum(m*w for m,w in zip(r[1:], weights)), reverse=True)
-    return results
+def screen(c, end_dt, w0, w1, w2):
+    assert w0 + w1 + w2 == 1
+    return c.execute('''
+SELECT s.sym, t0.return0, t1.return1, t2.volatility,
+       t0.return0 * ? + t1.return1 * ? - t2.volatility * ? AS score
+FROM
+(SELECT r0.sym_id AS sym_id, r0.return AS return0 FROM
+    return r0
+    NATURAL JOIN period r0p
+    NATURAL JOIN duration r0d
+ WHERE r0d.unit = 'quarter' AND
+       r0p.end_dt = ?) AS t0
+ NATURAL JOIN
+(SELECT r1.sym_id AS sym_id, r1.return AS return1 FROM
+    return r1
+    NATURAL JOIN period r1p
+    NATURAL JOIN duration r1d
+ WHERE r1d.unit = 'month' AND
+       r1p.end_dt = ?) AS t1
+ NATURAL JOIN
+ (SELECT v0.sym_id AS sym_id, v0.volatility AS volatility FROM
+    volatility v0
+    NATURAL JOIN period v0p
+    NATURAL JOIN duration v0d
+ WHERE v0d.unit = 'month' AND
+       v0p.end_dt = ?) AS t2
+ NATURAL JOIN symbol s
+ ORDER BY score DESC''', (w0, w1, w2, end_dt, end_dt, end_dt)).fetchall()
 
 def backtest(c, syms, period, metrics, weights):
     last_sym, last_dt = None, None
@@ -275,8 +277,9 @@ def main():
 ##        compute_periods(c)
 ##        create_derived_tables(c)
 ##        compute_returns(c)
-        compute_volatility(c)
-##        print screen(c, symbols(c), datetime.date(2012, 6, 29), ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))
+##        compute_volatility(c)
+        for s in screen(c, datetime.date(2012, 7, 6), 0.4, 0.4, 0.2):
+            print '\t'.join(map(str, s))
         #backtest(c, symbols(c), 'period_month_1', ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))       
 
 
