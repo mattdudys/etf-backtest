@@ -1,21 +1,30 @@
-broad-market:
+us-equity:
   DIA: SPDR DJIA Trust
-  IVV: iShares S&P 500 Index Fund
+  IVV: iShares S&P 500
+  IJR: iShares S&P SmallCap 600
   IWB: iShares Russell 1000
-  IWM: iShares Russel 2000
+  IWD: iShares Russell 1000 Value
+  IWF: iShares Russell 1000 Growth
+  IWM: iShares Russell 2000
+  IWN: iShares Russell 2000 Value
+  IWO: iShares Russell 2000 Growth
   MDY: SPDR S&P Midcap 400
+  PFF: iShares S&P US Preferred Stock
   RSP: Rydex Equal Weight S&P 500
   SPY: SPDR S&P 500
   
 sector:
   IBB: iShares NASDAQ Biotech
+  ITB: iShares Dow jones US Home Construction
   IYR: iShares Dow Jones U.S. Real Estate Index Fund
   IYT: iShares DJ Transportation
   PBW: PowerShares WilderHill Clean Energy
   PDP: PowerShares DWA Technical Leaders
   PHO: PowerShares Water Resources
   QQQ: PowerShares QQQ
+  RWR: SPDR Dow Jones REIT
   SMH: Market Vectors Semiconductor
+  VDC: Vanguard MSCI U.S. Consumer Staples
   VGT: Vanguard Information Technology
   VNQ: Vanguard U.S. REIT
   XHB: SPDR Homebuilders
@@ -34,12 +43,19 @@ international:
   BRF: Market Vectors Brazil Small Cap
   EEM: iShares MSCI Emerging Markets
   EFA: iShares MSCI EAFE
-  EPI: WisdomTree India Earnings Fund
+  EPI: WisdomTree India Earnings
   EWA: iShares MSCI Australia
   EWC: iShares MSCI Canada
+  EWG: iShares MSCI Germany
+  EWH: iShares MSCI Hong Kong
+  EWS: iShares MSCI South Korea
   EWT: iShares MSCI Taiwan
-  EWZ: iShares MSCI Brazil Index Fund
-  FXI: iShares FTSE-Xinhua China 25 Fund
+  EWJ: iShares MSCI Japan
+  EWW: iShares MSCI Mexico
+  EWY: iShares South Korea
+  EWZ: iShares MSCI Brazil
+  FXI: iShares FTSE-Xinhua China 25
+  PCY: PowerShares Emerging Mkts Bond (7-9yr)
   PID: PowerShares Int'l Dividend Achievers
   RWX: SPDR DJ Wilshire Int'l Real Estate
   VWO: Vanguard Emerging Markets
@@ -70,9 +86,11 @@ fixed-income:
   VCSH: Vanguard Short-Term Inv Grd Bond (2-3yr)
 
 commodities:
+  DBA: PowerShares DB Agricultural Commodities
   DBC: PowerShares DB Comm
   GDX: Market Vectors Gold Miners
   GLD: SPDR Gold Trust Shares
+  IAU: iShares COMEX Gold Trust
   SLV: iShares Silver
   USO: US Oil Fund ETF
   XOP: SPDR Oil & Gas Expl & Prod

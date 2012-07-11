@@ -8,6 +8,7 @@ import yaml
 from itertools import izip
 import numpy as np
 from collections import defaultdict
+from operator import itemgetter
 
 def drop_source(c):
     drop(c, *'period duration quote symbol'.split())
@@ -118,7 +119,7 @@ def insert_quotes(c):
     truncate(c, 'quote')
     ksym_vid = dict_q(c, 'symbol', 'sym', 'sym_id')
     for sym, sym_id in ksym_vid.iteritems():
-        ticks = get_historical_prices(sym, '2010-06-12', '2012-07-08')
+        ticks = get_historical_prices(sym, '2010-06-12', '2012-07-10')
         c.executemany('''
 INSERT OR REPLACE INTO quote (sym_id, dt, open, high, low, close, volume, adjClose) VALUES (
 (SELECT sym_id FROM symbol WHERE sym = ?),?,?,?,?,?,?,?)''', ticks)
@@ -186,9 +187,8 @@ GROUP BY vwp.period_id''', (sym_id, sym_id, sym_id))
 
 def screen(c, end_dt, w0, w1, w2):
     assert w0 + w1 + w2 == 1
-    return c.execute('''
-SELECT s.sym, t0.return0, t1.return1, t2.volatility,
-       t0.return0 * ? + t1.return1 * ? - t2.volatility * ? AS score
+    raw_results = c.execute('''
+SELECT s.sym, t0.return0, t1.return1, t2.volatility
 FROM
 (SELECT r0.sym_id AS sym_id, r0.return AS return0 FROM
     return r0
@@ -210,8 +210,18 @@ FROM
     NATURAL JOIN duration v0d
  WHERE v0d.unit = 'month' AND
        v0p.end_dt = ?) AS t2
- NATURAL JOIN symbol s
- ORDER BY score DESC''', (w0, w1, w2, end_dt, end_dt, end_dt)).fetchall()
+ NATURAL JOIN symbol s''', (end_dt, end_dt, end_dt)).fetchall()
+
+    weights = (w0, w1, w2)
+    scores = defaultdict(float)
+    for i in range(1,4):
+        rev = i != 3
+        ranked = sorted(map(itemgetter(0,i), raw_results), key=itemgetter(1), reverse=rev)
+        for rank, (sym, score) in enumerate(ranked):
+            scores[sym] += weights[i-1] * rank
+    final_ranked = sorted(scores.items(), key=itemgetter(1))
+    ksym_vdata = dict((r[0], r[1:]) for r in raw_results)
+    return [(i, sym) + ksym_vdata[sym] for i, (sym, score) in enumerate(final_ranked)]
 
 def backtest(c, syms, period, metrics, weights):
     last_sym, last_dt = None, None
@@ -271,15 +281,14 @@ def stdev(s):
 
 def main():    
     with sqlite3.connect('prices.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES) as c:
-##        create_source_tables(c)
-##        insert_symbols(c, 'symbols.yml')
-##        insert_quotes(c)
-##        compute_periods(c)
-##        create_derived_tables(c)
-##        compute_returns(c)
-##        compute_volatility(c)
-        for s in screen(c, datetime.date(2012, 7, 6), 0.4, 0.4, 0.2):
-            print '\t'.join(map(str, s))
+        create_source_tables(c)
+        insert_symbols(c, 'symbols.yml')
+        insert_quotes(c)
+        compute_periods(c)
+        create_derived_tables(c)
+        compute_returns(c)
+        compute_volatility(c)
+        print '\n'.join(map(str, screen(c, datetime.date(2012, 7, 10), 0.4, 0.4, 0.2)))
         #backtest(c, symbols(c), 'period_month_1', ('return_month_3', 'return_day_20', 'volatility_day_20'), (0.4, 0.3, -0.3))       
 
 
