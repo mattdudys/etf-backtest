@@ -1,6 +1,7 @@
 us-equity:
   DIA: SPDR DJIA Trust
   IVV: iShares S&P 500
+  IJH: iShares S&P MidCap 400
   IJR: iShares S&P SmallCap 600
   IWB: iShares Russell 1000
   IWD: iShares Russell 1000 Value
@@ -94,4 +95,9 @@ commodities:
   SLV: iShares Silver
   USO: US Oil Fund ETF
   XOP: SPDR Oil & Gas Expl & Prod
- 
+  
+currency:
+  UUP: Powershares DB US Dollar Bullish
+  FXE: CurrencyShares Euro Trust
+  FXY: CurrencyShares Japanese Yen Trust
+  FXB: CurrencyShares British Pound Sterling Trust
