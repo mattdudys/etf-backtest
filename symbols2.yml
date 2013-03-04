@@ -1,0 +1,89 @@
+us-equity:
+  DIA: SPDR DJIA Trust
+  IVV: iShares S&P 500
+  IJH: iShares S&P MidCap 400
+  IJR: iShares S&P SmallCap 600
+  IWB: iShares Russell 1000
+  IWD: iShares Russell 1000 Value
+  IWF: iShares Russell 1000 Growth
+  IWM: iShares Russell 2000
+  IWN: iShares Russell 2000 Value
+  IWO: iShares Russell 2000 Growth
+  MDY: SPDR S&P Midcap 400
+  PFF: iShares S&P US Preferred Stock
+  RSP: Rydex Equal Weight S&P 500
+  SPY: SPDR S&P 500
+  
+sector:
+  ITB: iShares Dow jones US Home Construction
+  IYR: iShares Dow Jones U.S. Real Estate Index Fund
+  IYT: iShares DJ Transportation
+  PBW: PowerShares WilderHill Clean Energy
+  PDP: PowerShares DWA Technical Leaders
+  PHO: PowerShares Water Resources
+  QQQ: PowerShares QQQ
+  RWR: SPDR Dow Jones REIT
+  SMH: Market Vectors Semiconductor
+  VDC: Vanguard MSCI U.S. Consumer Staples
+  VGT: Vanguard Information Technology
+  VNQ: Vanguard U.S. REIT
+  XHB: SPDR Homebuilders
+  XLB: SPDR Materials
+  XLE: SPDR Energy
+  XLF: SPDR Financial
+  XLI: SPDR Industrial
+  XLK: SPDR Technology
+  XLP: SPDR Consumer Staples
+  XLU: SPDR Utilities
+  XLV: SPDR Healthcare
+  XLY: SPDR Consumer Discretionary
+  XRT: SPDR Retail
+  
+international:
+  EEM: iShares MSCI Emerging Markets
+  EFA: iShares MSCI EAFE
+  PCY: PowerShares Emerging Mkts Bond (7-9yr)
+  PID: PowerShares Int'l Dividend Achievers
+  RWX: SPDR DJ Wilshire Int'l Real Estate
+  VWO: Vanguard Emerging Markets
+ 
+fixed-income:
+  AGG: iShares Barclays Aggregate Bond (4-5yr)
+  BIL: SPDR 1-3 Month T-Bill ETF (0.2yr)
+  BIV: Vanguard Barclays Govt-Credit Mix (6-7yr)
+  BLV: Vanguard Long-Term Bond ETF
+  BND: Banguard Total Bond Market (4-5yr)
+  BOND: PIMCO Total Return ETF
+  BSV: Banguard Short-Term Bond Mix (2-3yr)
+  CFT: iShares Barclays Credit Bond Index (6yr)
+  CIU: iShares Barclays Intermed Credit (4-5yr)
+  CSJ: iShares Barclays 1-3 Year Credit (2yr)
+  HYG: iShares iBoxx $ High Yield Corporate Bond Fund
+  IEF: iShares Barclays 7-10 Year Treasury Bond (7-8yr)
+  IEI: iShares Barclays 3-7 Year Treasury Bond (4-5yr)
+  JNK: SPDR Barcap High=Yield Junk Bond (4-7yr)
+  LQD: iShares iBoxx Invest Grade Bond (7-8yr)
+  MINT: PIMCO Enhanced Short-Term Bond (0.6yr)
+  SHV: Barclays Short-Term Ytreasury (0.4yr)
+  SHY: iShares Barclays 1-3 Year Treasury Bond Fund
+  STPZ: PIMCO 1-5 Year U.S. TIPS Index (2.5yr)
+  TIP: iShares Barclays TIPS (4-8yr)
+  TLT: iShares Barclays 20 Year Treasury Bond Fund
+  VCIT: Vanguard Interm Corp Bond (6-7yr)
+  VCSH: Vanguard Short-Term Inv Grd Bond (2-3yr)
+
+commodities:
+  DBA: PowerShares DB Agricultural Commodities
+  DBC: PowerShares DB Comm
+  GDX: Market Vectors Gold Miners
+  GLD: SPDR Gold Trust Shares
+  IAU: iShares COMEX Gold Trust
+  SLV: iShares Silver
+  USO: US Oil Fund ETF
+  XOP: SPDR Oil & Gas Expl & Prod
+  
+currency:
+  UUP: Powershares DB US Dollar Bullish
+  FXE: CurrencyShares Euro Trust
+  FXY: CurrencyShares Japanese Yen Trust
+  FXB: CurrencyShares British Pound Sterling Trust

@@ -5,7 +5,7 @@ import sys
 import ystockquote
 from pprint import pprint
 import yaml
-from itertools import izip, islice
+from itertools import izip, islice, dropwhile
 import numpy as np
 from collections import defaultdict
 from operator import itemgetter
@@ -13,7 +13,7 @@ from math import floor
 import cProfile
 
 START_DATE = '2005-09-30'
-END_DATE = '2012-07-25'
+END_DATE = '2013-03-03'
 
 def drop_source(c):
     drop(c, *'period duration quote symbol'.split())
@@ -198,16 +198,15 @@ def compute_volatility(c):
     vh = VolatilityHelper()
     for duration_id, unit, unit_qty, days in c.execute('select duration_id, unit, unit_qty, days from duration where days <> 1').fetchall():
         periods = {end_dt: period_id for period_id, end_dt in c.execute('select period_id, end_dt from period where duration_id = ?', (duration_id,))}
-        for sym_id, sym in c.execute('select sym_id, sym from symbol').fetchall():
+        for sym_id, sym in dict_q(c, 'symbol', 'sym_id', 'sym').iteritems():
             print '{} day volatility for {}'.format(days, sym)
             dt_dr = c.execute("""
 SELECT p.end_dt, r.return from
- return r, symbol s, period p, duration d
-WHERE r.sym_id = s.sym_id AND
+ return r, period p, duration d
+WHERE r.sym_id = ? AND
       r.period_id = p.period_id AND
       p.duration_id = d.duration_id AND
-      d.days = 1 AND
-      s.sym = ?""", (sym,)).fetchall()
+      d.days = 1""", (sym_id,)).fetchall()
             for start, end in enumerate(range(days+1, len(dt_dr)+1)):
                 ret = np.fromiter(vh.returns(islice(dt_dr, start, end)), np.float)
                 vol = ret.std() * 254 ** 0.5
@@ -345,7 +344,7 @@ def compute_parabolic_sar(c):
 
             d1, d2, d3 = d2, d3, d4
 
-def return_vol_screen(c, syms, end_dt, weights):
+def return_vol_screen(c, syms, start_dt, end_dt, weights):
     assert abs(sum(weights) - 1) < 0.001
     params = '?,' * (len(syms) - 1) + '?'
     raw_results = c.execute('''
@@ -391,8 +390,8 @@ FROM
     ksym_vdata = dict((r[0], r[1:]) for r in raw_results)
     return [(i, sym) + ksym_vdata[sym] for i, (sym, score) in enumerate(final_ranked)]
 
-def return_vol_ranked_screen(c, syms, end_dt, weights):
-    assert abs(sum(weights) - 1) < 0.001
+def return_vol_ranked_screen(c, syms, start_dt, end_dt, weights):
+    #assert abs(sum(weights) - 1) < 0.001
     params = '?,' * (len(syms) - 1) + '?'
     raw_results = c.execute('''
 SELECT s.sym, t0.return0, t1.return1, t2.volatility0, t3.volatility1
@@ -437,7 +436,7 @@ FROM
     ksym_vdata = dict((r[0], r[1:]) for r in raw_results)
     return [(i, sym) + ksym_vdata[sym] for i, (sym, score) in enumerate(final_ranked)]
 
-def sharpe_screen(c, syms, end_dt, weights):
+def sharpe_screen(c, syms, start_dt, end_dt, weights):
     assert abs(sum(weights) - 1) < 0.001
     params = '?,' * (len(syms) - 1) + '?'
     raw_results = c.execute('''
@@ -484,6 +483,13 @@ FROM
     ksym_vdata = dict((r[0], r[1:]) for r in raw_results)
     return [(i, sym) + ksym_vdata[sym] for i, (sym, score) in enumerate(final_ranked)]
 
+def sharpe_screen2(c, syms, start_dt, end_dt, weights):
+    sym_to_returns = {sym: daily_returns(c, sym, start_dt, end_dt) for sym in syms}
+    sym_to_returns = {sym: returns for sym, returns in sym_to_returns.iteritems() if len(returns) > 1}
+    sym_to_sharpe = {sym: avg(returns) / stdev(returns) * 252 ** 0.5 for sym, returns in sym_to_returns.iteritems() if stdev(returns) != 0}
+    sorted_by_sharpe = sorted(sym_to_sharpe.items(), key=itemgetter(1), reverse=True)
+    return [(i, sym, sharpe) for i, (sym, sharpe) in enumerate(sorted_by_sharpe)]
+
 def backtest(c, syms, screener, screener_args, start_cash=50000.00):
     assert start_cash > 0
     cash = start_cash
@@ -493,8 +499,9 @@ def backtest(c, syms, screener, screener_args, start_cash=50000.00):
     spy_returns = []
 
     sym = None
-    for d in month_ends(c):
-        scr_res = screener(c, syms, d, screener_args)
+    last_d = scalar_query(c, "SELECT MIN(dt) FROM quote")
+    for d in dropwhile(lambda dt: dt <= last_d, month_ends(c)):
+        scr_res = screener(c, syms, last_d, d, screener_args)
         if not scr_res:
             continue
 
@@ -552,15 +559,19 @@ def backtest(c, syms, screener, screener_args, start_cash=50000.00):
     spy_cash += exit_spy_amt
 
     # Print next screen
-    print '\n'.join(map(str, screener(c, syms, d, screener_args)))
+    print '\n'.join(map(str, screener(c, syms, last_d, d, screener_args)))
 
     # Print total performance
     tot_return = (cash - start_cash) / start_cash
     spy_tot_return = (spy_cash - start_cash) / start_cash
     tot_vol = stdev(returns) * 12 ** 0.5
     spy_vol = stdev(spy_returns) * 12 ** 0.5
+    tot_sharpe = sum(returns) / len(returns) / tot_vol
+    spy_sharpe = sum(spy_returns) / len(returns) / spy_vol
     for f, v in zip(('Return', 'SPY Return', 'Vol', 'SPY Vol'), (tot_return, spy_tot_return, tot_vol, spy_vol)):
         print '{:>10}: {:6.2%}'.format(f, v)
+    for f, v in zip(('Sharpe Ratio', 'SPY Sharpe Ratio'), (tot_sharpe, spy_sharpe)):
+        print '{:>10}: {:6.2f}'.format(f, v)
 
 def dict_q(c, table, key_col, value_col):
     '''returns a q_col_i -> id_col_i dict'''
@@ -589,36 +600,51 @@ def price(c, sym, dt):
 def symbols(c):
     return col_query(c, "SELECT s.sym FROM symbol s")
 
+def daily_returns(c, sym, start_dt, end_dt):
+    return map(float, col_query(c, """
+SELECT r.return
+FROM return r,
+     period p,
+     duration d,
+     symbol s
+WHERE r.sym_id = s.sym_id
+      AND r.period_id = p.period_id
+      AND p.duration_id = d.duration_id
+      AND d.days = 1
+      AND s.sym = ?
+      AND ? < p.end_dt AND p.end_dt <= ?""", sym, start_dt, end_dt))
+
 def avg(s):
     return sum(s) / len(s)
 
 def stdev(s):
     a = avg(s)
     sdsq = sum([(i - a) ** 2 for i in s])
-    stdev = (sdsq / (len(s) - 1)) ** 0.5
+    stdev = (sdsq / max(len(s) - 1, 1)) ** 0.5
     return stdev
 
 def main():
-    syms = 'VTI VEU VWO BLV'.split()
-    syms = 'RSP BLV EWA DBC VNQ VWO'.split()
-    with sqlite3.connect('symbols2.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES) as c:
-##        create_source_tables(c)
-##        insert_symbols(c, 'symbols2.yml')
-        #syms = list(symbols(c))
-        #syms.remove('MS')
-##        insert_quotes(c, START_DATE, END_DATE)
-##        compute_periods(c)
+##    syms = 'VTI VEU VWO BLV'.split()
+##    syms = 'RSP BLV EWA DBC VWO SHY'.split()
+    syms = 'DBC EFA SPY TLT VNQ BLV VWO BOND'.split()
+    with sqlite3.connect('prices.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES) as c:
+        create_source_tables(c)
+        insert_symbols(c, 'symbols.yml')
+##        syms = list(symbols(c))
+##        syms.remove('MS')
+        insert_quotes(c, START_DATE, END_DATE)
+        compute_periods(c)
         create_derived_tables(c)
-##        compute_returns(c)
-##        compute_volatility(c)
-##        compute_ulcer_index(c)
+        compute_returns(c)
+        compute_volatility(c)
+        compute_ulcer_index(c)
         compute_parabolic_sar(c)
 ##        print '\n'.join(map(str, return_vol_ranked_screen(c, syms, datetime.date(2012, 7, 17), (0.4, 0.3, 0, 0.3))))
 ##        print '\n'.join(map(str, sharpe_screen(c, 'SPY SHY TIP TLT BLV QQQ GLD VNQ EWA VWO'.split(), datetime.date(2012, 7, 10), (0.5, 0.5))))
-##        print price(c, 'SPY', datetime.date(2012, 7, 10))
         #cProfile.runctx('backtest(c, syms, return_vol_screen, (0.4, 0.3, 0, 0.3))', globals(), locals())
-        #backtest(c, syms, return_vol_ranked_screen, (.3, .3, 0, .4))
-        #backtest(c, syms, sharpe_screen, (0, 0, 0, 1, 0))
+        #backtest(c, syms, return_vol_ranked_screen, (.18, .72, 0, .1))
+        backtest(c, syms, sharpe_screen2, ())
+        print sharpe_screen2(c, syms, datetime.date(2013,2,1), datetime.date(2013,3,1), ())
         #backtest(c, ('SPY',), sharpe_screen, (0.6, 0.4))
 
 if __name__ == '__main__':

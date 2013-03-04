@@ -1,0 +1,39 @@
+us-fixed-income:
+  AGG: a
+  SHHYX: b
+  
+us-equity-large-cap:
+  SPY: c
+  MSEQX: d
+  DODGX: e
+  
+us-equity-mid-small-cap:
+  TMW: f
+  
+international-equity-large-cap:
+  ACWX: g
+  EFG: h
+  
+us-equity-mid-cap:
+  MPEGX: i
+  IWS: j
+  
+international-fixed-income:
+  MSIEX: k
+  PFUIX: l
+  
+tips:
+  TIP: m
+  
+company-stock:
+  MS: n
+  
+global-fixed-income:
+  EIGMX: o
+  
+reit:
+  MRLAX: p
+  
+commodities:
+  HDCRX: q
+  
